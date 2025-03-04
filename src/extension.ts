@@ -20,33 +20,54 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Register the askAI command
-	const askAIDisposable = vscode.commands.registerCommand('ai-coding-assistant.askAI', async () => {
-		// Prompt the user for input
-		const userInput = await vscode.window.showInputBox({
-			prompt: 'What would you like to ask the AI?',
-			placeHolder: 'e.g., Write a Python function to reverse a string'
-		});
+	// Register the askAI command
+const askAIDisposable = vscode.commands.registerCommand('ai-coding-assistant.askAI', async () => {
+    // Get the active text editor
+    const editor = vscode.window.activeTextEditor;
+    
+    // Prompt the user for input
+    const userInput = await vscode.window.showInputBox({
+        prompt: editor 
+            ? 'What would you like to know about this code?' 
+            : 'What would you like to ask the AI?',
+        placeHolder: editor 
+            ? 'e.g., Explain this code' 
+            : 'e.g., Write a Python function to reverse a string'
+    });
 
-		// Check if the user provided input or canceled the dialog
-		if (!userInput) {
-			return; // User canceled the input
-		}
+    // Check if the user provided input or canceled the dialog
+    if (!userInput) {
+        return; // User canceled the input
+    }
 
-		// Show a progress notification
-		vscode.window.withProgress({
-			location: vscode.ProgressLocation.Notification,
-			title: "AI is thinking...",
-			cancellable: false
-		}, async (progress) => {
-			try {
-				// Get the path to the Python script
-				const scriptPath = path.join(context.extensionPath, 'src', 'deepseek_local.py');
-				
-				// Execute the Python script with the user's input
-				const pythonProcess = child_process.spawn('python', [scriptPath, userInput]);
-				
-				let stdoutData = '';
-				let stderrData = '';
+    // Show a progress notification
+    vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "AI is thinking...",
+        cancellable: false
+    }, async (progress) => {
+        try {
+            // Get the path to the Python script
+            const scriptPath = path.join(context.extensionPath, 'src', 'deepseek_local.py');
+            
+            // Construct the combined prompt
+            let combinedPrompt = userInput;
+            if (editor) {
+                const fileContent = editor.document.getText();
+                const language = editor.document.languageId;
+                if (fileContent.trim()) {
+                    combinedPrompt = `File content (${language}):\n${fileContent}\n\nUser query: ${userInput}`;
+                }
+            }
+            
+            // Execute the Python script with the combined prompt
+            const pythonProcess = child_process.spawn('python', [
+                scriptPath, 
+                combinedPrompt
+            ]);
+            
+            let stdoutData = '';
+            let stderrData = '';
 				
 				// Collect stdout data
 				pythonProcess.stdout.on('data', (data) => {
